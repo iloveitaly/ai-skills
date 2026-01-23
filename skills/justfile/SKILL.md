@@ -68,50 +68,117 @@ If you need help with `just` please feel free to open an issue or ping me on
 [Discord](https://discord.gg/ezYScXR). Feature requests and bug reports are
 always welcome!
 
-## Installation
+## Quick Start
 
-### Prerequisites
+See the installation section for how to install `just` on your computer. Try
+running `just --version` to make sure that it's installed correctly.
 
-`just` should run on any system with a reasonable `sh`, including Linux, MacOS,
-and the BSDs.
+For an overview of the syntax, check out
+[this cheatsheet](https://cheatography.com/linux-china/cheat-sheets/justfile/).
 
-#### Windows
-
-On Windows, `just` works with the `sh` provided by
-[Git for Windows](https://git-scm.com),
-[GitHub Desktop](https://desktop.github.com), or
-[Cygwin](http://www.cygwin.com). After installation, `sh` must be
-available in the `PATH` of the shell you want to to invoke `just` from.
-
-If you'd rather not install `sh`, you can use the `shell` setting to use the
-shell of your choice.
-
-Like PowerShell:
+Once `just` is installed and working, create a file named `justfile` in the
+root of your project with the following contents:
 
 ```just
-# use PowerShell instead of sh:
-set shell := ["powershell.exe", "-c"]
+recipe-name:
+  echo 'This is a recipe!'
 
-hello:
-  Write-Host "Hello, world!"
+# this is a comment
+another-recipe:
+  @echo 'This is another recipe.'
 ```
 
-…or `cmd.exe`:
+When you invoke `just` it looks for file `justfile` in the current directory
+and upwards, so you can invoke it from any subdirectory of your project.
+
+The search for a `justfile` is case insensitive, so any case, like `Justfile`,
+`JUSTFILE`, or `JuStFiLe`, will work. `just` will also look for files with the
+name `.justfile`, in case you'd like to hide a `justfile`.
+
+Running `just` with no arguments runs the first recipe in the `justfile`:
+
+```console
+$ just
+echo 'This is a recipe!'
+This is a recipe!
+```
+
+One or more arguments specify the recipe(s) to run:
+
+```console
+$ just another-recipe
+This is another recipe.
+```
+
+`just` prints each command to standard error before running it, which is why
+`echo 'This is a recipe!'` was printed. This is suppressed for lines starting
+with `@`, which is why `echo 'This is another recipe.'` was not printed.
+
+Recipes stop running if a command fails. Here `cargo publish` will only run if
+`cargo test` succeeds:
 
 ```just
-# use cmd.exe instead of sh:
-set shell := ["cmd.exe", "/c"]
-
-list:
-  dir
+publish:
+  cargo test
+  # tests passed, time to publish!
+  cargo publish
 ```
 
-You can also set the shell using command-line arguments. For example, to use
-PowerShell, launch `just` with `--shell powershell.exe --shell-arg -c`.
+Recipes can depend on other recipes. Here the `test` recipe depends on the
+`build` recipe, so `build` will run before `test`:
 
-(PowerShell is installed by default on Windows 7 SP1 and Windows Server 2008 R2
-S1 and later, and `cmd.exe` is quite fiddly, so PowerShell is recommended for
-most Windows users.)
+```just
+build:
+  cc main.c foo.c bar.c -o main
+
+test: build
+  ./test
+
+sloc:
+  @echo "`wc -l *.c` lines of code"
+```
+
+```console
+$ just test
+cc main.c foo.c bar.c -o main
+./test
+testing… all tests passed!
+```
+
+Recipes without dependencies will run in the order they're given on the command
+line:
+
+```console
+$ just build sloc
+cc main.c foo.c bar.c -o main
+1337 lines of code
+```
+
+Dependencies will always run first, even if they are passed after a recipe that
+depends on them:
+
+```console
+$ just test build
+cc main.c foo.c bar.c -o main
+./test
+testing… all tests passed!
+```
+
+Recipes may depend on recipes in submodules:
+
+```justfile
+mod foo
+
+baz: foo::bar
+```
+
+## Examples
+
+A variety of `justfile`s can be found in the
+[examples directory](https://github.com/casey/just/tree/master/examples) and on
+[GitHub](https://github.com/search?q=path%3A**%2Fjustfile&type=code).
+
+## Features
 
 ### The Default Recipe
 
@@ -3663,560 +3730,3 @@ commands<sup>1.41.0</sup>.
 On Windows, `just` behaves as if it had received `SIGINT` when the user types
 `ctrl-c`. Other signals are unsupported.
 
-## Changelog
-
-A changelog for the latest release is available in
-[CHANGELOG.md](https://raw.githubusercontent.com/casey/just/master/CHANGELOG.md).
-Changelogs for previous releases are available on
-[the releases page](https://github.com/casey/just/releases). `just --changelog`
-can also be used to make a `just` binary print its changelog.
-
-## Miscellanea
-
-### Re-running recipes when files change
-
-[`watchexec`](https://github.com/mattgreen/watchexec) can re-run any command
-when files change.
-
-To re-run the recipe `foo` when any file changes:
-
-```console
-watchexec just foo
-```
-
-See `watchexec --help` for more info, including how to specify which files
-should be watched for changes.
-
-### Parallelism
-
-Dependencies may be run in parallel with the `[parallel]` attribute.
-
-In this `justfile`, `foo`, `bar`, and `baz` will execute in parallel when
-`main` is run:
-
-```just
-[parallel]
-main: foo bar baz
-
-foo:
-  sleep 1
-
-bar:
-  sleep 1
-
-baz:
-  sleep 1
-```
-
-GNU `parallel` may be used to run recipe lines concurrently:
-
-```just
-parallel:
-  #!/usr/bin/env -S parallel --shebang --ungroup --jobs {{ num_cpus() }}
-  echo task 1 start; sleep 3; echo task 1 done
-  echo task 2 start; sleep 3; echo task 2 done
-  echo task 3 start; sleep 3; echo task 3 done
-  echo task 4 start; sleep 3; echo task 4 done
-```
-
-### Shell Alias
-
-For lightning-fast command running, put `alias j=just` in your shell's
-configuration file.
-
-In `bash`, the aliased command may not keep the shell completion functionality
-described in the next section. Add the following line to your `.bashrc` to use
-the same completion function as `just` for your aliased command:
-
-```console
-complete -F _just -o bashdefault -o default j
-```
-
-### Shell Completion Scripts
-
-Shell completion scripts for Bash, Elvish, Fish, Nushell, PowerShell, and Zsh
-are available [release archives](https://github.com/casey/just/releases).
-
-The `just` binary can also generate the same completion scripts at runtime
-using `just --completions SHELL`:
-
-```console
-$ just --completions zsh > just.zsh
-```
-
-Please refer to your shell's documentation for how to install them.
-
-*macOS Note:* Recent versions of macOS use zsh as the default shell. If you use
-Homebrew to install `just`, it will automatically install the most recent copy
-of the zsh completion script in the Homebrew zsh directory, which the built-in
-version of zsh doesn't know about by default. It's best to use this copy of the
-script if possible, since it will be updated whenever you update `just` via
-Homebrew. Also, many other Homebrew packages use the same location for
-completion scripts, and the built-in zsh doesn't know about those either. To
-take advantage of `just` completion in zsh in this scenario, you can set
-`fpath` to the Homebrew location before calling `compinit`. Note also that Oh
-My Zsh runs `compinit` by default. So your `.zshrc` file could look like this:
-
-```zsh
-# Init Homebrew, which adds environment variables
-eval "$(brew shellenv)"
-
-fpath=($HOMEBREW_PREFIX/share/zsh/site-functions $fpath)
-
-# Then choose one of these options:
-# 1. If you're using Oh My Zsh, you can initialize it here
-# source $ZSH/oh-my-zsh.sh
-
-# 2. Otherwise, run compinit yourself
-# autoload -U compinit
-# compinit
-```
-
-### Man Page
-
-`just` can print its own man page with `just --man`. Man pages are written in
-[`roff`](https://en.wikipedia.org/wiki/Roff_%28software%29), a venerable markup
-language and one of the first practical applications of Unix. If you have
-[`groff`](https://www.gnu.org/software/groff/) installed you can view the man
-page with  `just --man | groff -mandoc -Tascii | less`.
-
-### Grammar
-
-A non-normative grammar of `justfile`s can be found in
-[GRAMMAR.md](https://github.com/casey/just/blob/master/GRAMMAR.md).
-
-### just.sh
-
-Before `just` was a fancy Rust program it was a tiny shell script that called
-`make`. You can find the old version in
-[contrib/just.sh](https://github.com/casey/just/blob/master/contrib/just.sh).
-
-### Global and User `justfile`s
-
-If you want some recipes to be available everywhere, you have a few options.
-
-#### Global Justfile
-
-`just --global-justfile`, or `just -g` for short, searches the following paths,
-in-order, for a justfile:
-
-- `$XDG_CONFIG_HOME/just/justfile`
-- `$HOME/.config/just/justfile`
-- `$HOME/justfile`
-- `$HOME/.justfile`
-
-You can put recipes that are used across many projects in a global justfile to
-easily invoke them from any directory.
-
-#### User justfile tips
-
-You can also adopt some of the following workflows. These tips assume you've
-created a `justfile` at `~/.user.justfile`, but you can put this `justfile`
-at any convenient path on your system.
-
-##### Recipe Aliases
-
-If you want to call the recipes in `~/.user.justfile` by name, and don't mind
-creating an alias for every recipe, add the following to your shell's
-initialization script:
-
-```console
-for recipe in `just --justfile ~/.user.justfile --summary`; do
-  alias $recipe="just --justfile ~/.user.justfile --working-directory . $recipe"
-done
-```
-
-Now, if you have a recipe called `foo` in `~/.user.justfile`, you can just type
-`foo` at the command line to run it.
-
-It took me way too long to realize that you could create recipe aliases like
-this. Notwithstanding my tardiness, I am very pleased to bring you this major
-advance in `justfile` technology.
-
-##### Forwarding Alias
-
-If you'd rather not create aliases for every recipe, you can create a single alias:
-
-```console
-alias .j='just --justfile ~/.user.justfile --working-directory .'
-```
-
-Now, if you have a recipe called `foo` in `~/.user.justfile`, you can just type
-`.j foo` at the command line to run it.
-
-I'm pretty sure that nobody actually uses this feature, but it's there.
-
-¯\\\_(ツ)\_/¯
-
-##### Customization
-
-You can customize the above aliases with additional options. For example, if
-you'd prefer to have the recipes in your `justfile` run in your home directory,
-instead of the current directory:
-
-```console
-alias .j='just --justfile ~/.user.justfile --working-directory ~'
-```
-
-### Node.js `package.json` Script Compatibility
-
-The following export statement gives `just` recipes access to local Node module
-binaries, and makes `just` recipe commands behave more like `script` entries in
-Node.js `package.json` files:
-
-```just
-export PATH := "./node_modules/.bin:" + env_var('PATH')
-```
-
-### Paths on Windows
-
-On Windows, all functions that return paths, except `invocation_directory()`
-will return `\`-separated paths. When not using PowerShell or `cmd.exe` these
-paths should be quoted to prevent the `\`s from being interpreted as character
-escapes:
-
-```just
-ls:
-    echo '{{absolute_path(".")}}'
-```
-
-`cygpath.exe` is an executable included in some distributions of Unix userlands
-for Windows, including [Cygwin](https://www.cygwin.com/) and
-[Git](https://git-scm.com/downloads) for Windows.
-
-`just` uses `cygpath.exe` in two places:
-
-For backwards compatibility, `invocation_directory()`, uses `cygpath.exe` to
-convert the invocation directory into a unix-style `/`-separated path. Use
-`invocation_directory_native()` to get the native, Windows-style path. On unix,
-`invocation_directory()` and `invocation_directory_native()` both return the
-same unix-style path.
-
-`cygpath.exe` is used also used to convert Unix-style shebang lines into
-Windows paths. As an alternative, the `[script]` attribute, currently unstable,
-can be used, which does not depend on `cygpath.exe`.
-
-If `cygpath.exe` is available, you can use it to convert between path styles:
-
-```just
-foo_unix := '/hello/world'
-foo_windows := shell('cygpath --windows $1', foo_unix)
-
-bar_windows := 'C:\hello\world'
-bar_unix := shell('cygpath --unix $1', bar_windows)
-```
-
-### Remote Justfiles
-
-If you wish to include a `mod` or `import` source file in many `justfiles`
-without needing to duplicate it, you can use an optional `mod` or `import`,
-along with a recipe to fetch the module source:
-
-```just
-import? 'foo.just'
-
-fetch:
-  curl https://raw.githubusercontent.com/casey/just/master/justfile > foo.just
-```
-
-Given the above `justfile`, after running `just fetch`, the recipes in
-`foo.just` will be available.
-
-### Printing Complex Strings
-
-`echo` can be used to print strings, but because it processes escape sequences,
-like `\n`, and different implementations of `echo` recognize different escape
-sequences, using `printf` is often a better choice.
-
-`printf` takes a C-style format string and any number of arguments, which are
-interpolated into the format string.
-
-This can be combined with indented, triple quoted strings to emulate shell
-heredocs.
-
-Substitution complex strings into recipe bodies with `{…}` can also lead to
-trouble as it may be split by the shell into multiple arguments depending on
-the presence of whitespace and quotes. Exporting complex strings as environment
-variables and referring to them with `"$NAME"`, note the double quotes, can
-also help.
-
-Putting all this together, to print a string verbatim to standard output, with
-all its various escape sequences and quotes undisturbed:
-
-```just
-export FOO := '''
-  a complicated string with
-  some dis\tur\bi\ng escape sequences
-  and "quotes" of 'different' kinds
-'''
-
-bar:
-  printf %s "$FOO"
-```
-
-### Alternatives and Prior Art
-
-There is no shortage of command runners! Some more or less similar alternatives
-to `just` include:
-
-- [make](https://en.wikipedia.org/wiki/Make_(software)): The Unix build tool
-that inspired `just`. There are a few different modern day descendents of the
-original `make`, including
-[FreeBSD Make](https://www.freebsd.org/cgi/man.cgi?make(1)) and
-[GNU Make](https://www.gnu.org/software/make/).
-- [task](https://github.com/go-task/task): A YAML-based command runner written
-in Go.
-- [maid](https://github.com/egoist/maid): A Markdown-based command runner
-written in JavaScript.
-- [microsoft/just](https://github.com/microsoft/just): A JavaScript-based
-command runner written in JavaScript.
-- [cargo-make](https://github.com/sagiegurari/cargo-make): A command runner for
-Rust projects.
-- [mmake](https://github.com/tj/mmake): A wrapper around `make` with a number
-of improvements, including remote includes.
-- [robo](https://github.com/tj/robo): A YAML-based command runner written in
-Go.
-- [mask](https://github.com/jakedeichert/mask): A Markdown-based command runner
-written in Rust.
-- [makesure](https://github.com/xonixx/makesure): A simple and portable command
-runner written in AWK and shell.
-- [haku](https://github.com/VladimirMarkelov/haku): A make-like command runner
-written in Rust.
-- [mise](https://mise.jdx.dev/): A development environment tool manager written
-in Rust supporing tasks in TOML files and standalone scripts.
-
-## Contributing
-
-`just` welcomes your contributions! `just` is released under the maximally
-permissive
-[CC0](https://creativecommons.org/publicdomain/zero/1.0/legalcode.txt) public
-domain dedication and fallback license, so your changes must also be released
-under this license.
-
-### Getting Started
-
-`just` is written in Rust. Use
-[rustup](https://www.rust-lang.org/tools/install) to install a Rust toolchain.
-
-`just` is extensively tested. All new features must be covered by unit or
-integration tests. Unit tests are under
-[src](https://github.com/casey/just/blob/master/src), live alongside the code
-being tested, and test code in isolation. Integration tests are in the [tests
-directory](https://github.com/casey/just/blob/master/tests) and test the `just`
-binary from the outside by invoking `just` on a given `justfile` and set of
-command-line arguments, and checking the output.
-
-You should write whichever type of tests are easiest to write for your feature
-while still providing good test coverage.
-
-Unit tests are useful for testing new Rust functions that are used internally
-and as an aid for development. A good example are the unit tests which cover
-the
-[`unindent()` function](https://github.com/casey/just/blob/master/src/unindent.rs),
-used to unindent triple-quoted strings and backticks. `unindent()` has a bunch
-of tricky edge cases which are easy to exercise with unit tests that call
-`unindent()` directly.
-
-Integration tests are useful for making sure that the final behavior of the
-`just` binary is correct. `unindent()` is also covered by integration tests
-which make sure that evaluating a triple-quoted string produces the correct
-unindented value. However, there are not integration tests for all possible
-cases. These are covered by faster, more concise unit tests that call
-`unindent()` directly.
-
-Integration tests use the `Test` struct, a builder which allows for easily
-invoking `just` with a given `justfile`, arguments, and environment variables,
-and checking the program's stdout, stderr, and exit code .
-
-### Contribution Workflow
-
-1. Make sure the feature is wanted. There should be an open issue about the
-feature with a comment from [@casey](https://github.com/casey) saying that
-it's a good idea or seems reasonable. If there isn't, open a new issue and
-ask for feedback.
-   
-   There are lots of good features which can't be merged, either because they
-aren't backwards compatible, have an implementation which would
-overcomplicate the codebase, or go against `just`'s design philosophy.
-2. Settle on the design of the feature. If the feature has multiple possible
-implementations or syntaxes, make sure to nail down the details in the
-issue.
-3. Clone `just` and start hacking. The best workflow is to have the code you're
-working on in an editor alongside a job that re-runs tests whenever a file
-changes. You can run such a job by installing
-[cargo-watch](https://github.com/watchexec/cargo-watch) with `cargo install cargo-watch` and running `just watch test`.
-4. Add a failing test for your feature. Most of the time this will be an
-integration test which exercises the feature end-to-end. Look for an
-appropriate file to put the test in in
-[tests](https://github.com/casey/just/blob/master/tests), or add a new file
-in [tests](https://github.com/casey/just/blob/master/tests) and add a `mod`
-statement importing that file in
-[tests/lib.rs](https://github.com/casey/just/blob/master/tests/lib.rs).
-5. Implement the feature.
-6. Run `just ci` to make sure that all tests, lints, and checks pass. Requires
-[mdBook](https://github.com/rust-lang/mdBook) and
-[mdbook-linkcheck](https://github.com/Michael-F-Bryan/mdbook-linkcheck).
-7. Open a PR with the new code that is editable by maintainers. PRs often
-require rebasing and minor tweaks. If the PR is not editable by maintainers,
-each rebase and tweak will require a round trip of code review. Your PR may
-be summarily closed if it is not editable by maintainers.
-8. Incorporate feedback.
-9. Enjoy the sweet feeling of your PR getting merged!
-
-Feel free to open a draft PR at any time for discussion and feedback.
-
-### Hints
-
-Here are some hints to get you started with specific kinds of new features,
-which you can use in addition to the contribution workflow above.
-
-#### Adding a New Attribute
-
-1. Write a new integration test in
-[tests/attributes.rs](https://github.com/casey/just/blob/master/tests/attributes.rs).
-2. Add a new variant to the
-[`Attribute`](https://github.com/casey/just/blob/master/src/attribute.rs)
-enum.
-3. Implement the functionality of the new attribute.
-4. Run `just ci` to make sure that all tests pass.
-
-### Janus
-
-[Janus](https://github.com/casey/janus) is a tool for checking whether a change
-to `just` breaks or changes the interpretation of existing `justfile`s. It
-collects and analyzes public `justfile`s on GitHub.
-
-Before merging a particularly large or gruesome change, Janus should be run to
-make sure that nothing breaks. Don't worry about running Janus yourself, Casey
-will happily run it for you on changes that need it.
-
-### Minimum Supported Rust Version
-
-The minimum supported Rust version, or MSRV, is current stable Rust. It may
-build on older versions of Rust, but this is not guaranteed.
-
-### New Releases
-
-New releases of `just` are made frequently so that users quickly get access to
-new features.
-
-Release commit messages use the following template:
-
-```
-Release x.y.z
-
-- Bump version: x.y.z → x.y.z
-- Update changelog
-- Update changelog contributor credits
-- Update dependencies
-- Update version references in readme
-```
-
-## Frequently Asked Questions
-
-### What are the idiosyncrasies of Make that Just avoids?
-
-`make` has some behaviors which are confusing, complicated, or make it
-unsuitable for use as a general command runner.
-
-One example is that under some circumstances, `make` won't actually run the
-commands in a recipe. For example, if you have a file called `test` and the
-following makefile:
-
-```just
-test:
-  ./test
-```
-
-`make` will refuse to run your tests:
-
-```console
-$ make test
-make: `test' is up to date.
-```
-
-`make` assumes that the `test` recipe produces a file called `test`. Since this
-file exists and the recipe has no other dependencies, `make` thinks that it
-doesn't have anything to do and exits.
-
-To be fair, this behavior is desirable when using `make` as a build system, but
-not when using it as a command runner. You can disable this behavior for
-specific targets using `make`'s built-in
-[`.PHONY` target name](https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html),
-but the syntax is verbose and can be hard to remember. The explicit list of
-phony targets, written separately from the recipe definitions, also introduces
-the risk of accidentally defining a new non-phony target. In `just`, all
-recipes are treated as if they were phony.
-
-Other examples of `make`'s idiosyncrasies include the difference between `=`
-and `:=` in assignments, the confusing error messages that are produced if you
-mess up your makefile, needing `$$` to use environment variables in recipes,
-and incompatibilities between different flavors of `make`.
-
-### What's the relationship between Just and Cargo build scripts?
-
-[`cargo` build scripts](http://doc.crates.io/build-script.html) have a pretty
-specific use, which is to control how `cargo` builds your Rust project. This
-might include adding flags to `rustc` invocations, building an external
-dependency, or running some kind of codegen step.
-
-`just`, on the other hand, is for all the other miscellaneous commands you
-might run as part of development. Things like running tests in different
-configurations, linting your code, pushing build artifacts to a server,
-removing temporary files, and the like.
-
-Also, although `just` is written in Rust, it can be used regardless of the
-language or build system your project uses.
-
-## Further Ramblings
-
-I personally find it very useful to write a `justfile` for almost every
-project, big or small.
-
-On a big project with multiple contributors, it's very useful to have a file
-with all the commands needed to work on the project close at hand.
-
-There are probably different commands to test, build, lint, deploy, and the
-like, and having them all in one place is useful and cuts down on the time you
-have to spend telling people which commands to run and how to type them.
-
-And, with an easy place to put commands, it's likely that you'll come up with
-other useful things which are part of the project's collective wisdom, but
-which aren't written down anywhere, like the arcane commands needed for some
-part of your revision control workflow, to install all your project's
-dependencies, or all the random flags you might need to pass to the build
-system.
-
-Some ideas for recipes:
-
-- Deploying/publishing the project
-- Building in release mode vs debug mode
-- Running in debug mode or with logging enabled
-- Complex git workflows
-- Updating dependencies
-- Running different sets of tests, for example fast tests vs slow tests, or
-running them with verbose output
-- Any complex set of commands that you really should write down somewhere, if
-only to be able to remember them
-
-Even for small, personal projects it's nice to be able to remember commands by
-name instead of ^Reverse searching your shell history, and it's a huge boon to
-be able to go into an old project written in a random language with a
-mysterious build system and know that all the commands you need to do whatever
-you need to do are in the `justfile`, and that if you type `just` something
-useful (or at least interesting!) will probably happen.
-
-For ideas for recipes, check out
-[this project's `justfile`](https://github.com/casey/just/blob/master/justfile),
-or some of the
-`justfile`s
-[out in the wild](https://github.com/search?q=path%3A**%2Fjustfile&type=code).
-
-Anyways, I think that's about it for this incredibly long-winded README.
-
-I hope you enjoy using `just` and find great success and satisfaction in all
-your computational endeavors!
-
-😸
-
-[🔼 Back to the top!](#just)

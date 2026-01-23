@@ -9,7 +9,7 @@ import requests
 from pathlib import Path
 from marko import Markdown
 from marko.md_renderer import MarkdownRenderer
-from marko.block import Heading, HTMLBlock
+from marko.block import Heading, HTMLBlock, SetextHeading
 
 README_URL = 'https://raw.githubusercontent.com/casey/just/refs/heads/master/README.md'
 SKILL_FILE = Path(__file__).parent.parent / "skills" / "justfile" / "SKILL.md"
@@ -35,7 +35,7 @@ def filter_markdown(text):
     keeping = True
 
     for node in document.children:
-        if isinstance(node, Heading):
+        if isinstance(node, (Heading, SetextHeading)):
             # Extract plain text from heading (handles links/bold inside titles)
             title = get_text(node).lower().strip()
             
