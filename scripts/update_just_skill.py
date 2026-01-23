@@ -8,6 +8,7 @@
 import requests
 from pathlib import Path
 from marko import Markdown
+from marko.md_renderer import MarkdownRenderer
 from marko.block import Heading, HTMLBlock
 
 README_URL = 'https://raw.githubusercontent.com/casey/just/refs/heads/master/README.md'
@@ -27,7 +28,7 @@ def get_text(element):
 
 def filter_markdown(text):
     # Initialize the parser
-    markdown = Markdown()
+    markdown = Markdown(renderer=MarkdownRenderer)
     document = markdown.parse(text)
     
     new_children = []
