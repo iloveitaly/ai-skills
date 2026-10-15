@@ -22,7 +22,7 @@ The starter recipe adds CLI exclusions beyond those in [copier.yml](https://gith
 - Preserve application dependencies, database migration history, deployment choices, and frontend behavior while reconciling applicable configuration changes.
 - Check both the template's tool configuration and excluded project configuration when tool pins or dependency inputs changed.
 - Inspect the bootstrap script and tasks for file transformations that explain destination differences. Initialization commits, host setup, trust commands, and environment activation are not a checklist to replay during updates.
-- Discover validation through the local Justfile and its included recipes. Linting may span Python, frontend, database, and development configuration; select checks from the affected behavior and project requirements.
+- Linting may span Python, frontend, database, and development configuration. When the update affects one of those surfaces, include it in the lint and test run from the main procedure.
 
 ## python-package-template
 
@@ -51,5 +51,5 @@ Review relevant upstream changes to checkout depth, mise setup and bootstrap opt
 - In `pyproject.toml`, preserve project name, version policy, application dependencies, entry points, and custom tool configuration. Reconcile upstream build requirements, classifiers, and development dependencies from the actual diff rather than hardcoded versions.
 - When upstream changes version imports or exports, adapt the project's package layout and public API. Preserve existing import tests and add or adapt version checks only when the change warrants them. Remove a `main()` placeholder only after confirming it is unused boilerplate.
 - Inspect effective exclusions for project-owned files such as `uv.lock`, `mise.lock`, metadata, licenses, and changelogs. Use the project's sync/lock commands when inputs changed.
-- Inspect skipped workflow selection, conditional Docker/database files, tool setup, and rule-generation tasks. Respect their conditions and existing project choices. Do not run generic upgrades, regenerate a secret-scanning baseline, or change GitHub settings as an automatic part of template reconciliation.
-- Use available local recipes for validation. `uv sync`, `just lint-fix`, `just lint`, and `just test` are common examples, not requirements for every generated project. Include packaging or CLI checks when affected by the update.
+- Inspect skipped workflow selection, conditional Docker/database files, tool setup, and rule-generation tasks. Respect their conditions and existing project choices. Do not regenerate a secret-scanning baseline or change GitHub settings as an automatic part of template reconciliation.
+- Local recipe names vary. `uv sync`, `just lint-fix`, `just lint`, and `just test` are common. Add packaging or CLI checks when the update affects them.

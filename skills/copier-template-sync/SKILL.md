@@ -86,15 +86,32 @@ Use the recorded full SHAs for `old_sha` and `new_sha`. Inspect detailed diffs f
 
 - **Effective exclusions:** combine recipe/CLI exclusions with the template's `_exclude`, including conditional patterns. Exclusions match destination paths. An excluded template configuration file still governs generation; exclusion does not disable its settings.
 - **Preserved or deleted paths:** distinguish `_skip_if_exists` from `_exclude`. Copier respects paths previously deleted from the generated project; do not recreate them without understanding why they were removed.
-- **Skipped tasks:** determine which effects are relevant to this update and already satisfied. Reconcile needed file moves or generated artifacts selectively. Do not replay initialization, dependency upgrades, baseline generation, or external repository changes merely because they appear in `_tasks`.
+- **Skipped tasks:** determine which effects are relevant to this update and already satisfied. Reconcile needed file moves or generated artifacts selectively. Do not replay initialization, baseline generation, or external repository changes merely because they appear in `_tasks`. Dependency upgrades run later through `just upgrade` when that recipe exists; do not also replay upgrade commands from `_tasks`.
 - **Relocated and conditional files:** inspect task-driven renames, renamed package directories, and changed question answers. Apply the selected variant to the project's actual destination, preserving its customizations.
 - **New files and tool changes:** check relevant workflows, dotfiles, tool configuration, and lockfile inputs. Regenerate project lockfiles with the project's commands when their inputs changed; do not copy the template's lockfiles wholesale.
 
 Apply improvements supported by this range and relevant to the project. Inspect rendered workflow changes for action versions, tool setup, matrix behavior, permissions, and release steps without treating any particular setting as mandatory. Record significant changes deliberately omitted and why. See [exclusions](https://copier.readthedocs.io/en/stable/configuring/#exclude) and [deleted-path handling](https://copier.readthedocs.io/en/stable/updating/#handling-of-deleted-paths).
 
-## 6. Validate and report completion
+## 6. Commit the template update
 
-Discover the destination's dependency setup, formatting, linting, tests, and build commands from its recipes, configuration, and project instructions. Run the checks appropriate to the changed behavior. Review automated fixes for unintended changes, then repeat the conflict checks and review the complete diff:
+After reconciliation, commit the template-sync changes before upgrading dependencies or running checks. Do this in the worktree that holds the update. Stage only paths that belong to this update, and leave unrelated work unstaged. The message should name the template and the old and applied revisions.
+
+If the tree is clean, skip the commit. If a hook modifies files or rejects the commit, fix the cause and commit again. Do not amend. Do not push or open a pull request unless the user asks.
+
+## 7. Upgrade, validate, and commit
+
+If `just --list` shows an `upgrade` recipe, inspect it and run it:
+
+```bash
+just --show upgrade
+just upgrade
+```
+
+If the recipe is absent, or Just is unavailable, skip it. Do not substitute another upgrade command.
+
+Then run the project's lint and tests. Prefer its Just recipes when they exist; otherwise use the commands from project configuration and instructions. When a lint-fix recipe exists, run it, review the diff for unintended edits, and re-run lint and tests. Fix failures caused by this update before the final commit.
+
+Repeat the conflict checks, then review the diff:
 
 ```bash
 git diff --check
@@ -102,4 +119,6 @@ git diff --stat
 git status --short
 ```
 
-Finish with the template source, old and applied revisions, manual reconciliations, significant omissions, checks passed or blocked, and any remaining gaps. Identify where the changes live if an isolated worktree was used. Distinguish local checks from CI or deployment evidence. Follow the user's scope for staging, committing, and publishing.
+Commit the remaining changes from `just upgrade` and from fixing the checks. Stage only those paths. If that produced no changes, do not create an empty commit. Use the same hook and publishing rules as the template-sync commit.
+
+Finish with the template source, old and applied revisions, both commit SHAs (or note when a commit was skipped), manual reconciliations, significant omissions, checks passed or blocked, and any remaining gaps. Identify where the changes live if an isolated worktree was used. Distinguish local checks from CI or deployment evidence.
