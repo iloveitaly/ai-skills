@@ -9,6 +9,20 @@ Update a generated project while preserving its own behavior and configuration. 
 
 For projects generated from `iloveitaly/python-starter-template` or `iloveitaly/python-package-template`, read [references/python-templates.md](references/python-templates.md). Use those examples only for the matching template and project options.
 
+## Delegate execution
+
+The main agent coordinates, reviews evidence and diffs, and decides questions of project intent. Delegate all routine execution to subagents: discovery, commands, edits, conflict resolution, audits, upgrades, checks and fixes, and Git/PR mechanics. Use `gpt-6.1-sol` or an available model with similar intelligence, with medium reasoning where supported; never select the lowest-quality tier just to reduce cost. If the spawning tool requires fresh context for model overrides (for example, `fork_turns: none`), use it and explicitly supply the scoped handoff context below. If delegation or model selection is unavailable, state the limitation and use the best available agent or execute inline without claiming delegation occurred.
+
+Give each subagent this skill and the applicable reference, the destination/worktree, its phase and write scope, and prior handoff evidence. Use the procedure below as the shared instructions rather than repeating it in every task. Delegate in dependency order:
+
+1. **Discovery and preflight:** steps 1–2 and the execution inspection in step 3. Return the recipe, worktree/baseline, answers, source, resolved old/target refs, execution risks, and unresolved intent decisions before Copier runs.
+2. **Copier and conflicts:** execute step 3 and resolve step 4. Return the actually applied ref/SHA, resulting diff, conflict evidence, and any recovery work.
+3. **Upstream audit and reconciliation:** step 5 against the recorded old and actually applied SHAs. Cover the entire range, including excluded, deleted, renamed, conditional, and relocated paths. Return a coverage map from every changed upstream path to its destination and disposition: applied, already satisfied, inapplicable, or deliberately omitted with reasons. Investigate unmapped paths before declaring the audit complete.
+4. **Upgrades and validation:** step 6, including failure diagnosis and fixes. Return exact commands, results, diff changes, and any blocked checks.
+5. **Git and PR:** step 7 only after lint, tests, and conflict checks pass and the main agent reviews the result. Return commits, branch/remote, PR URL, and final status.
+
+Keep one writer at a time in each destination worktree, including the index and branch. Parallelize independent read-only discovery or audit slices against fixed revisions; give each slice explicit coverage and combine their results before reconciliation. Do not overlap Copier, reconciliation, upgrades, or Git mutations. At each handoff, preserve the destination, baseline and applied revisions, changed paths, command outcomes, and unresolved issues so the next agent works from verified state. Recheck affected validation after later fixes or hook changes. Subagents inherit the same authorization limits; delegation does not authorize additional actions. Escalate intent decisions to the main agent, which asks the user only when repository evidence cannot resolve them.
+
 ## 1. Find the project's update recipe first
 
 Confirm the destination repository and generated subdirectory. Inspect its Justfile, included files, and available recipes before choosing an update command:
@@ -92,15 +106,9 @@ Use the recorded full SHAs for `old_sha` and `new_sha`. Inspect detailed diffs f
 
 Apply improvements supported by this range and relevant to the project. Inspect rendered workflow changes for action versions, tool setup, matrix behavior, permissions, and release steps without treating any particular setting as mandatory. Record significant changes deliberately omitted and why. See [exclusions](https://copier.readthedocs.io/en/stable/configuring/#exclude) and [deleted-path handling](https://copier.readthedocs.io/en/stable/updating/#handling-of-deleted-paths).
 
-## 6. Commit the template update
+## 6. Upgrade and validate
 
-After reconciliation, commit the template-sync changes before upgrading dependencies or running checks. Do this in the worktree that holds the update. Stage only paths that belong to this update, and leave unrelated work unstaged. The message should name the template and the old and applied revisions.
-
-If the tree is clean, skip the commit. If a hook modifies files or rejects the commit, fix the cause and commit again. Do not amend. Do not push or open a pull request unless the user asks.
-
-## 7. Upgrade, validate, and commit
-
-If `just --list` shows an `upgrade` recipe, inspect it and run it:
+If `just --list` shows an `upgrade` recipe, inspect it and run it after reconciling the template update:
 
 ```bash
 just --show upgrade
@@ -109,7 +117,7 @@ just upgrade
 
 If the recipe is absent, or Just is unavailable, skip it. Do not substitute another upgrade command.
 
-Then run the project's lint and tests. Prefer its Just recipes when they exist; otherwise use the commands from project configuration and instructions. When a lint-fix recipe exists, run it, review the diff for unintended edits, and re-run lint and tests. Fix failures caused by this update before the final commit.
+Then run the project's lint and tests. Prefer its Just recipes when they exist; otherwise use the commands from project configuration and instructions. When a lint-fix recipe exists, run it, review the diff for unintended edits, and re-run lint and tests. Fix failures caused by this update before committing.
 
 Repeat the conflict checks, then review the diff:
 
@@ -119,6 +127,15 @@ git diff --stat
 git status --short
 ```
 
-Commit the remaining changes from `just upgrade` and from fixing the checks. Stage only those paths. If that produced no changes, do not create an empty commit. Use the same hook and publishing rules as the template-sync commit.
+## 7. Branch, commit, push, and open a PR (`gh ai-pr`)
 
-Finish with the template source, old and applied revisions, both commit SHAs (or note when a commit was skipped), manual reconciliations, significant omissions, checks passed or blocked, and any remaining gaps. Identify where the changes live if an isolated worktree was used. Distinguish local checks from CI or deployment evidence.
+Once linting, tests, and conflict checks have all passed and the main agent has reviewed the result, hand off the Git branching, committing, pushing, and PR creation under the delegation rules above. Do not hand off before linting and tests have succeeded.
+
+The subagent should:
+
+1. **Create a feature branch** if currently on the default branch (`main` or `master`), since `gh ai-pr` requires a non-default branch (e.g., `git switch -c chore/copier-template-sync`). Do this in the worktree that holds the update.
+2. **Commit the changes** in logical commits (or separated into the template-sync commit naming the template and old/applied revisions, followed by the `just upgrade` / lint-fix commit). Stage only paths that belong to this update and leave unrelated work unstaged. If a hook modifies files or rejects the commit, fix the cause and commit again without amending unrelated commits.
+3. **Push the branch** to the remote (`git push -u origin HEAD`).
+4. **Run `gh ai-pr` and create the PR**: execute `gh ai-pr` to generate the PR context and template prompt, then create (or update) the pull request using `gh pr create --head "$(git branch --show-current)" --title "..." --body "..."` following the rules emitted by `gh ai-pr`.
+
+Finish with the template source, old and applied revisions, commit SHAs, PR URL, manual reconciliations, significant omissions, checks passed or blocked, and any remaining gaps. Identify where the changes live if an isolated worktree was used. Distinguish local checks from CI or deployment evidence.
