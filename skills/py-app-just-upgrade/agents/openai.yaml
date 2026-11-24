@@ -1,0 +1,3 @@
+interface:
+  display_name: "Python App Just Upgrade"
+  short_description: "Run just upgrade non-interactively, audit lockfiles and changelogs, and validate the PR"
